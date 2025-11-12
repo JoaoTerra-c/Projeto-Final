@@ -8,7 +8,7 @@ typedef enum {
 
 typedef struct {
 
-    //Identificador único
+    //Identificador Único
     int id;
 
     //Pessoa física ou jurídica
