@@ -1,0 +1,22 @@
+#include <stdio.h>
+
+// Detalhar o pedido
+
+void detalharPedido() {
+    int codigo;
+    printf("\nInforme o código do pedido: ");
+    scanf("%d", &codigo);
+
+    for (int i = 0; i < qtdPedidos; i++) {
+        if (pedidos[i].pedidoCOD == codigo) {
+            printf("\n=== DETALHES DO PEDIDO ===\n");
+            printf("Código do Pedido: %d\n", pedidos[i].pedidoCOD);
+            printf("Código do Cliente: %d\n", pedidos[i].cliente);
+            printf("Data: %s\n", pedidos[i].data);
+            printf("Total: R$ %.2f\n", pedidos[i].total);
+            return;
+        }
+    }
+
+    printf("Pedido não encontrado.\n");
+}
