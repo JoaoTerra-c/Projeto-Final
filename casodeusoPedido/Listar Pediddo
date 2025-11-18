@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "pedido.h"
+
 
 // Lista pedido.
 
