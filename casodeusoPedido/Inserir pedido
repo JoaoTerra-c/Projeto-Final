@@ -1,6 +1,5 @@
 #include <stdio.h>
 
-
 //Inserir Pedido
 
 Pedido pedidos[MAX_PEDIDOS]; // definição da variável global
