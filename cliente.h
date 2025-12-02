@@ -38,7 +38,6 @@ int cadastro_endereco(char out[200]);
 int cadastro_telefone(char out[20]);
 int cadastro_email(char out[100]);
 
-int cadastro_pf(void);
 
 int validar_codigo_cliente(const char *codigo);
 int cliente_codigo_existe_no_csv(const char *path, const char *codigo);
@@ -47,5 +46,19 @@ int cliente_gravar_csv(const Cliente *c);
 int cliente_obter_proximo_id_pelo_csv(const char *caminho_csv);
 
 int cadastro_cnpj(const char *cnpj_entrada, char cnpj_saida[15]);
+
+int cliente_cpf_existe_no_csv(const char *caminho_arquivo_csv, const char *cpf_procurado);
+int cliente_cnpj_existe_no_csv(const char *caminho_arquivo_csv, const char *cnpj_procurado);
+
+void normaliza_excel_texto(char *s);
+void somente_digitos(char *s);
+
+int cliente_buscar_por_codigo(const char *path, const char *codigo, Cliente *out);
+
+int cliente_remover_por_codigo(const char *path, const char *codigo);
+
+int cliente_carregar_todos(const char *path, Cliente **vet, int *n); // aloca e carrega todos
+void cliente_libera_lista(Cliente *vet);                             // libera o vetor
+int ui_listar_clientes(WINDOW *janela);                              // UI ncurses
 
 #endif
