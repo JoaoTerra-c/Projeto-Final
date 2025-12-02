@@ -1,0 +1,20 @@
+#include <stdio.h>
+
+// Lista pedido.
+
+void listarPedidos() {
+    printf("\n=== LISTA DE PEDIDOS ===\n");
+
+    if (qtdPedidos == 0) {
+        printf("Nenhum pedido cadastrado.\n");
+        return;
+    }
+
+    for (int i = 0; i < qtdPedidos; i++) {
+        printf("Pedido: %d | Cliente: %d | Data: %s | Total: R$ %.2f\n",
+               pedidos[i].pedidoCOD,
+               pedidos[i].cliente,
+               pedidos[i].data,
+               pedidos[i].total);
+    }
+}

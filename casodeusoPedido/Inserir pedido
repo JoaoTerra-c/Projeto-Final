@@ -1,0 +1,33 @@
+#include <stdio.h>
+
+//Inserir Pedido
+
+Pedido pedidos[MAX_PEDIDOS]; // definição da variável global
+int qtdPedidos = 0;
+
+void inserirPedido() {
+    if (qtdPedidos >= MAX_PEDIDOS) {
+        printf("Limite máximo de pedidos atingido.\n");
+        return;
+    }
+
+    Pedido novo;
+
+    printf("\n=== INSERIR PEDIDO ===\n");
+    printf("Código do Pedido: ");
+    scanf("%d", &novo.pedidoCOD);
+
+    printf("Código do Cliente: ");
+    scanf("%d", &novo.cliente);
+
+    printf("Data (dd/mm/aaaa): ");
+    scanf("%s", novo.data);
+
+    printf("Valor Total: R$ ");
+    scanf("%f", &novo.total);
+
+    pedidos[qtdPedidos] = novo;
+    qtdPedidos++;
+
+    printf("Pedido cadastrado com sucesso!\n");
+}
