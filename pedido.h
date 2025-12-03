@@ -8,9 +8,6 @@
 #define maxStatus 30
 
 #define ARQUIVO_PEDIDOS   "Pedidos.csv"
-#define ARQUIVO_CLIENTES  "Clientes.csv"
-#define ARQUIVO_PRODUTOS  "Produtos.csv"
-
 typedef struct {
     int codigoPedido;
     int codigoCliente;
@@ -22,7 +19,7 @@ typedef struct {
     char status[maxStatus];
 } Pedido;
 
-/* Funções utilitárias e verificações */
+/* Funções */
 void obterDataAtual(char *destino, int tamanho);
 int codigoClienteJaExiste(const char *arquivoClientes, int code);
 int codigoProdutoJaExiste(const char *arquivoProdutos, int code);
