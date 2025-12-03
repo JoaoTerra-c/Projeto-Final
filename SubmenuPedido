@@ -19,9 +19,6 @@
    - produto.csv  (cada linha: id ; descricao ; preco ; estoque)
    - Pedidos.csv  (arquivo de pedidos, criado/atualizado por este módulo)
 
-   Observações:
-   - Este módulo usa suas próprias funções de entrada (ui_getline_or_esc) para permitir ESC.
-   - Integre chamando as funções a partir do menu (vide submenu_pedido no seu menu.c).
 */
 
 #define ARQUIVO_PEDIDOS "Pedidos.csv"
