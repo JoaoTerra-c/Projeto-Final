@@ -6,7 +6,7 @@
 
 /*
    pedido_ncurses.c
-   Módulo de pedidos com interface ncurses (janelas) compatível com o estilo do menu de cliente.
+
 
    Funcionalidades:
    - Cadastrar pedido (com validação de existência de cliente/produto em CSV)
@@ -357,7 +357,6 @@ int ui_remover_pedido(WINDOW *janela, const char *arquivoClientes) {
     return deletado ? 0 : 1;
 }
 
-/* ===================== Submenu para integrar com menu.c ===================== */
 void submenu_pedido_ncurses() {
     int xmax, ymax; getmaxyx(stdscr, ymax, xmax);
     WINDOW *jan = newwin(20, xmax - 10, ymax - 25, 5);
