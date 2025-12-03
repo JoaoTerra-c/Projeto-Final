@@ -22,16 +22,19 @@ typedef struct {
     char status[maxStatus];
 } Pedido;
 
-void obterDataAtual(char *destino, int tamanho);
-int codigoClienteJaExiste(const char *arquivoClientes, int code);
-int codigoProdutoJaExiste(const char *arquivoProdutos, int code);
-int obterDadosProduto(const char *arquivoProdutos, int codigoProduto, char *descricaoDestino, double *precoDestino);
-int codigoPedidoJaExiste(FILE* fpPe, int code);
+//Funções
+
+int codClientejaaExiste(const char *arquivoClientes, int code);
+void DataAtual(char *destino, int tamanho);
+int codProdutojaExiste(const char *arquivoProdutos, int code);
+nt codigoPedidojaExiste(FILE* fpPe, int code);
+int obterinfoProduto(const char *arquivoProdutos, int codigoProduto, char *descricaoDestino, double *precoDestino);
+
 
 void cadastrarPedido(FILE *fpPe, const char *arquivoClientes, const char *arquivoProdutos);
 void listarPedidos(FILE *fpPe);
 int consultarPedido(FILE *fpPe, const char *arquivoClientes);
-FILE* atualizarPedido(FILE *fpPe, const char *arquivoClientes, const char *arquivoProdutos);
 FILE* deletarPedido(FILE *fpPe, const char *arquivoClientes);
+FILE* atualizarPedido(FILE *fpPe, const char *arquivoClientes, const char *arquivoProdutos);
 
 #endif
