@@ -1,4 +1,4 @@
-// pedido.c  
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,12 +6,16 @@
 #include <ncurses.h>
 #include "pedido.h"
 
-/* Funções utilitárias */
+/* Funções */
 void obterDataAtual(char *destino, int tamanho){
     time_t agora = time(NULL);
-    struct tm *tm_info = localtime(&agora);
-    snprintf(destino, tamanho, "%02d/%02d/%04d",
-             tm_info->tm_mday, tm_info->tm_mon + 1, tm_info->tm_year + 1900);
+    struct tm *d = localtime(&agora);
+
+    // Informar Data
+    sprintf(destino, "%d/%d/%d",
+            d->tm_mday,
+            d->tm_mon + 1,
+            d->tm_year + 1900);
 }
 
 /* Verifica se um código de cliente existe */
@@ -33,7 +37,7 @@ int codigoClienteJaExiste(const char *arquivoClientes, int code){
     return 0;
 }
 
-/* Verifica se um código de produto existe */
+/*  Se um código de produto já existe */
 int codigoProdutoJaExiste(const char *arquivoProdutos, int code){
     FILE *fp = fopen(arquivoProdutos, "r");
     if(!fp) return 0;
