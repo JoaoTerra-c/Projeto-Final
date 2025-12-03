@@ -18,7 +18,7 @@ void obterDataAtual(char *destino, int tamanho){
             d->tm_year + 1900);
 }
 
-/* Verifica se um código de cliente existe */
+/* Codigo do cliente já existe */
 int codigoClienteJaExiste(const char *arquivoClientes, int code){
     FILE *fp = fopen(arquivoClientes, "r");
     if(!fp) return 0;
@@ -172,8 +172,7 @@ void listarPedidos(FILE *fpPe){
 
     Pedido p;
     printw("===== LISTA DE PEDIDOS =====\n\n");
-
-    /* leitura com fscanf usando %[^;] para com espaços; s */
+    
     while(fscanf(fpPe, "%d ; %d ; %d ; %d ; %[^;] ; %[^;] ; %lf ; %s\n",
                  &p.codigoPedido, &p.codigoCliente, &p.codigoProduto, &p.quantidade,
                  p.data, p.descricao, &p.valorTotal, p.status) == 8){
@@ -308,7 +307,7 @@ FILE* atualizarPedido(FILE *fpPe, const char *arquivoClientes, const char *arqui
 
     fpPe = fopen(ARQUIVO_PEDIDOS, "a+");
     if(!fpPe){
-        /* se falhar, avise e retorne NULL (ou NULL-like comportamento) */
+        /* se falhar retorna NULL */
         clear();
         mvprintw(1,0,"Erro ao reabrir arquivo de pedidos!");
         getch();
@@ -325,7 +324,7 @@ FILE* atualizarPedido(FILE *fpPe, const char *arquivoClientes, const char *arqui
     return fpPe;
 }
 
-/* DELETAR */
+/* DELETAR PEDIDO */
 FILE* deletarPedido(FILE *fpPe, const char *arquivoClientes){
 
     clear();
