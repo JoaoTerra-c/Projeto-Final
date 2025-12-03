@@ -31,7 +31,6 @@ int obterDadosProduto(const char *arquivoProdutos, int codigoProduto,
 void cadastrarPedido(FILE *fpPe, const char *arquivoClientes, const char *arquivoProdutos);
 void listarPedidos(FILE *fpPe);
 int consultarPedido(FILE *fpPe, const char *arquivoClientes);
-FILE* atualizarPedido(FILE *fpPe, const char *arquivoClientes, const char *arquivoProdutos);
 FILE* deletarPedido(FILE *fpPe, const char *arquivoClientes);
 
 #endif
