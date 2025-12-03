@@ -1,0 +1,395 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ncurses.h>
+#include <time.h>
+
+/*
+   pedido_ncurses.c
+   Módulo de pedidos com interface ncurses (janelas) compatível com o estilo do menu de cliente.
+
+   Funcionalidades:
+   - Cadastrar pedido (com validação de existência de cliente/produto em CSV)
+   - Listar pedidos
+   - Consultar pedidos por cliente
+   - Remover pedido
+
+   Arquivos CSV esperados:
+   - cliente.csv  (cada linha começa com: id ; ...)
+   - produto.csv  (cada linha: id ; descricao ; preco ; estoque)
+   - Pedidos.csv  (arquivo de pedidos, criado/atualizado por este módulo)
+
+   Observações:
+   - Este módulo usa suas próprias funções de entrada (ui_getline_or_esc) para permitir ESC.
+   - Integre chamando as funções a partir do menu (vide submenu_pedido no seu menu.c).
+*/
+
+#define ARQUIVO_PEDIDOS "Pedidos.csv"
+#define MAX_DATA 32
+
+typedef struct {
+    int codigoPedido;
+    int codigoCliente;
+    int codigoProduto;
+    int quantidade;
+    char data[MAX_DATA];
+    char descricao[200];
+    double valorTotal;
+    char status[64];
+} Pedido;
+
+/* pequena util util para ler linha com ESC (retorna -1 se ESC digitado) */
+static int ui_getline_or_esc(WINDOW *win, int y, int x, char *buf, int maxlen) {
+    int ch;
+    wmove(win, y, x);
+    wrefresh(win);
+
+    noecho();
+    curs_set(1);
+
+    int i = 0;
+    while (1) {
+        ch = wgetch(win);
+        if (ch == 27) { // ESC
+            buf[0] = '\0';
+            noecho(); curs_set(0);
+            return -1;
+        } else if (ch == '\n' || ch == KEY_ENTER) {
+            buf[i] = '\0';
+            break;
+        } else if (ch == KEY_BACKSPACE || ch == 127 || ch == 8) {
+            if (i > 0) {
+                i--; 
+                mvwdelch(win, y, x + i);
+                wmove(win, y, x + i);
+                wrefresh(win);
+            }
+        } else if (i < maxlen - 1 && ch >= 32 && ch < 127) {
+            buf[i++] = (char)ch;
+            wechochar(win, ch);
+        }
+    }
+
+    noecho();
+    curs_set(0);
+    return 0;
+}
+
+/* obter data atual como dd/mm/yyyy */
+static void obterDataAtual(char *destino, int tamanho) {
+    time_t agora = time(NULL);
+    struct tm *d = localtime(&agora);
+    snprintf(destino, tamanho, "%02d/%02d/%04d", d->tm_mday, d->tm_mon + 1, d->tm_year + 1900);
+}
+
+/* verifica se existe id (int) na primeira coluna do arquivo (arquivo com linhas iniciando por "id ;") */
+static int id_existe_no_csv(const char *arquivo, int idprocurado) {
+    FILE *fp = fopen(arquivo, "r");
+    if (!fp) return 0; // se não abrir, consideramos como "não existe" (consistente com outros módulos)
+
+    char linha[1024];
+    while (fgets(linha, sizeof(linha), fp)) {
+        int id;
+        if (sscanf(linha, "%d ;", &id) == 1) {
+            if (id == idprocurado) {
+                fclose(fp);
+                return 1;
+            }
+        }
+    }
+    fclose(fp);
+    return 0;
+}
+
+/* Obtém descricao e preco do produto */
+static int obterDadosProduto(const char *arquivoProdutos, int codigoProduto, char *descricaoDestino, double *precoDestino) {
+    FILE *fp = fopen(arquivoProdutos, "r");
+    if(!fp) return 0;
+
+    char linha[1024];
+    while(fgets(linha, sizeof(linha), fp)){
+        int id; char desc[200]; double preco; int est;
+        if(sscanf(linha, "%d ; %[^;] ; %lf ; %d", &id, desc, &preco, &est) == 4) {
+            if(id == codigoProduto) {
+                strncpy(descricaoDestino, desc, 199);
+                descricaoDestino[199] = '\0';
+                *precoDestino = preco;
+                fclose(fp);
+                return 1;
+            }
+        }
+    }
+    fclose(fp);
+    return 0;
+}
+
+/* verifica se codigo de pedido existe no arquivo de pedidos */
+static int codigoPedidoJaExiste(const char *arquivo, int code) {
+    FILE *fp = fopen(arquivo, "r");
+    if(!fp) return 0;
+    char linha[1024];
+    while(fgets(linha, sizeof(linha), fp)){
+        int id;
+        if(sscanf(linha, "%d ;", &id) == 1){
+            if(id == code){ fclose(fp); return 1; }
+        }
+    }
+    fclose(fp);
+    return 0;
+}
+
+/* ===================== UI: Cadastrar Pedido (janela) ===================== */
+int ui_cadastrar_pedido(WINDOW *janela, const char *arquivoClientes, const char *arquivoProdutos) {
+    int xmax, ymax; getmaxyx(janela, ymax, xmax);
+    werase(janela); box(janela,0,0);
+    mvwprintw(janela,1,3,"===== Cadastrar Pedido =====");
+    mvwprintw(janela,ymax-2,3,"[ESC] cancelar");
+
+    char buf_codigoPedido[32];
+    char buf_codigoCliente[32];
+    char buf_codigoProduto[32];
+    char buf_quantidade[16];
+
+    // entrada codigo do pedido
+    for(;;) {
+        mvwprintw(janela,3,3,"Codigo do Pedido: %-10s", "");
+        wrefresh(janela);
+        if (ui_getline_or_esc(janela, 3, 22, buf_codigoPedido, sizeof(buf_codigoPedido)) < 0) {
+            werase(janela); box(janela,0,0); mvwprintw(janela,3,3,"Cadastro cancelado."); wrefresh(janela); wgetch(janela); return -1;
+        }
+        int cod = atoi(buf_codigoPedido);
+        if (cod <= 0) {
+            mvwprintw(janela,5,3,"Codigo invalido."); wrefresh(janela); wgetch(janela); mvwprintw(janela,5,3,"%-40s"," "); continue;
+        }
+        if (codigoPedidoJaExiste(ARQUIVO_PEDIDOS, cod)) {
+            mvwprintw(janela,5,3,"Codigo ja existe."); wrefresh(janela); wgetch(janela); mvwprintw(janela,5,3,"%-40s"," "); continue;
+        }
+        break;
+    }
+
+    // codigo cliente
+    for(;;) {
+        mvwprintw(janela,6,3,"Codigo do Cliente: %-10s", "");
+        wrefresh(janela);
+        if (ui_getline_or_esc(janela, 6, 24, buf_codigoCliente, sizeof(buf_codigoCliente)) < 0) {
+            werase(janela); box(janela,0,0); mvwprintw(janela,3,3,"Cadastro cancelado."); wrefresh(janela); wgetch(janela); return -1;
+        }
+        int codc = atoi(buf_codigoCliente);
+        if (codc <= 0) { mvwprintw(janela,8,3,"Codigo cliente invalido."); wrefresh(janela); wgetch(janela); mvwprintw(janela,8,3,"%-40s"," "); continue; }
+        if (!id_existe_no_csv(arquivoClientes, codc)) { mvwprintw(janela,8,3,"Cliente nao encontrado."); wrefresh(janela); wgetch(janela); mvwprintw(janela,8,3,"%-40s"," "); continue; }
+        break;
+    }
+
+    // codigo produto
+    for(;;) {
+        mvwprintw(janela,9,3,"Codigo do Produto: %-10s", "");
+        wrefresh(janela);
+        if (ui_getline_or_esc(janela, 9, 25, buf_codigoProduto, sizeof(buf_codigoProduto)) < 0) {
+            werase(janela); box(janela,0,0); mvwprintw(janela,3,3,"Cadastro cancelado."); wrefresh(janela); wgetch(janela); return -1;
+        }
+        int codp = atoi(buf_codigoProduto);
+        if (codp <= 0) { mvwprintw(janela,11,3,"Codigo produto invalido."); wrefresh(janela); wgetch(janela); mvwprintw(janela,11,3,"%-40s"," "); continue; }
+        if (!id_existe_no_csv(arquivoProdutos, codp)) { mvwprintw(janela,11,3,"Produto nao encontrado."); wrefresh(janela); wgetch(janela); mvwprintw(janela,11,3,"%-40s"," "); continue; }
+        break;
+    }
+
+    // quantidade
+    for(;;) {
+        mvwprintw(janela,13,3,"Quantidade: %-6s", "");
+        wrefresh(janela);
+        if (ui_getline_or_esc(janela, 13, 15, buf_quantidade, sizeof(buf_quantidade)) < 0) {
+            werase(janela); box(janela,0,0); mvwprintw(janela,3,3,"Cadastro cancelado."); wrefresh(janela); wgetch(janela); return -1;
+        }
+        int q = atoi(buf_quantidade);
+        if (q <= 0) { mvwprintw(janela,15,3,"Quantidade invalida."); wrefresh(janela); wgetch(janela); mvwprintw(janela,15,3,"%-40s"," "); continue; }
+        break;
+    }
+
+    // obter dados do produto para descricao e preco
+    Pedido p = {0};
+    p.codigoPedido = atoi(buf_codigoPedido);
+    p.codigoCliente = atoi(buf_codigoCliente);
+    p.codigoProduto = atoi(buf_codigoProduto);
+    p.quantidade = atoi(buf_quantidade);
+
+    double precoUnit;
+    if (!obterDadosProduto(arquivoProdutos, p.codigoProduto, p.descricao, &precoUnit)) {
+        mvwprintw(janela,17,3,"Erro ao obter dados do produto."); wrefresh(janela); wgetch(janela); return -1;
+    }
+
+    p.valorTotal = p.quantidade * precoUnit;
+    obterDataAtual(p.data, MAX_DATA);
+    strcpy(p.status, "Pendente");
+
+    // gravar em arquivo (append)
+    FILE *fp = fopen(ARQUIVO_PEDIDOS, "a+");
+    if(!fp) {
+        mvwprintw(janela,17,3,"Erro ao abrir arquivo de pedidos."); wrefresh(janela); wgetch(janela); return -1;
+    }
+
+    fprintf(fp, "%d ; %d ; %d ; %d ; %s ; %s ; %.2f ; %s\n",
+            p.codigoPedido, p.codigoCliente, p.codigoProduto, p.quantidade,
+            p.data, p.descricao, p.valorTotal, p.status);
+    fflush(fp);
+    fclose(fp);
+
+    mvwprintw(janela,18,3,"Pedido cadastrado com sucesso. Pressione uma tecla.");
+    wrefresh(janela);
+    wgetch(janela);
+    return 0;
+}
+
+/* ===================== UI: Listar Pedidos ===================== */
+int ui_listar_pedidos(WINDOW *janela) {
+    werase(janela); box(janela,0,0);
+    mvwprintw(janela,1,3,"===== Lista de Pedidos =====");
+    mvwprintw(janela,2,3,"(Pressione qualquer tecla para voltar)");
+
+    FILE *fp = fopen(ARQUIVO_PEDIDOS, "r");
+    if(!fp) { mvwprintw(janela,4,3,"Nenhum pedido cadastrado."); wrefresh(janela); wgetch(janela); return 0; }
+
+    int linha = 4;
+    char buffer[1024];
+    while(fgets(buffer, sizeof(buffer), fp)){
+        if (linha >= LINES - 2) {
+            mvwprintw(janela, LINES - 2, 3, "-- Mais (pressione tecla) --"); wrefresh(janela); wgetch(janela);
+            werase(janela); box(janela,0,0);
+            mvwprintw(janela,1,3,"===== Lista de Pedidos (cont.) =====");
+            linha = 3;
+        }
+        // mostra a linha tal qual, mas formatada um pouco
+        // formato esperado: codigo ; cliente ; produto ; qtd ; data ; descricao ; total ; status
+        int cpd, ccli, cprod, qtd;
+        char data[64], desc[200], status[64]; double total;
+        if (sscanf(buffer, "%d ; %d ; %d ; %d ; %[^;] ; %[^;] ; %lf ; %s", &cpd, &ccli, &cprod, &qtd, data, desc, &total, status) == 8) {
+            mvwprintw(janela, linha++, 3, "Ped %d | Cli %d | Prod %d | Qtd %d | Total %.2f | %s", cpd, ccli, cprod, qtd, total, status);
+        } else {
+            mvwprintw(janela, linha++, 3, "%s", buffer);
+        }
+    }
+    fclose(fp);
+    wrefresh(janela);
+    wgetch(janela);
+    return 0;
+}
+
+/* ===================== UI: Consultar Pedidos por Cliente ===================== */
+int ui_consultar_pedido(WINDOW *janela, const char *arquivoClientes) {
+    werase(janela); box(janela,0,0);
+    mvwprintw(janela,1,3,"===== Consultar Pedidos por Cliente =====");
+    mvwprintw(janela,3,3,"Codigo do Cliente: ");
+    wrefresh(janela);
+
+    char buf[64];
+    if (ui_getline_or_esc(janela, 3, 21, buf, sizeof(buf)) < 0) { mvwprintw(janela,5,3,"Operacao cancelada."); wrefresh(janela); wgetch(janela); return -1; }
+    int codc = atoi(buf);
+    if (!id_existe_no_csv(arquivoClientes, codc)) { mvwprintw(janela,5,3,"Cliente nao existe."); wrefresh(janela); wgetch(janela); return -1; }
+
+    FILE *fp = fopen(ARQUIVO_PEDIDOS, "r");
+    if(!fp) { mvwprintw(janela,5,3,"Nenhum pedido cadastrado."); wrefresh(janela); wgetch(janela); return 0; }
+
+    int linha = 5;
+    char buffer[1024];
+    mvwprintw(janela,4,3,"Pedidos do cliente %d:", codc);
+    while(fgets(buffer, sizeof(buffer), fp)){
+        int cpd, ccli, cprod, qtd; char data[64], desc[200], status[64]; double total;
+        if (sscanf(buffer, "%d ; %d ; %d ; %d ; %[^;] ; %[^;] ; %lf ; %s", &cpd, &ccli, &cprod, &qtd, data, desc, &total, status) == 8) {
+            if (ccli == codc) {
+                if (linha >= LINES - 2) {
+                    mvwprintw(janela, LINES - 2, 3, "-- Mais (pressione tecla) --"); wrefresh(janela); wgetch(janela);
+                    werase(janela); box(janela,0,0); linha = 3;
+                }
+                mvwprintw(janela, linha++, 3, "Pedido %d | Produto %d | Qtd %d | Total %.2f | %s", cpd, cprod, qtd, total, status);
+            }
+        }
+    }
+    fclose(fp);
+    wrefresh(janela);
+    wgetch(janela);
+    return 0;
+}
+
+/* ===================== UI: Remover Pedido ===================== */
+int ui_remover_pedido(WINDOW *janela, const char *arquivoClientes) {
+    werase(janela); box(janela,0,0);
+    mvwprintw(janela,1,3,"===== Remover Pedido =====");
+    mvwprintw(janela,3,3,"Codigo do Cliente: ");
+    wrefresh(janela);
+
+    char bufCli[64];
+    if (ui_getline_or_esc(janela, 3, 21, bufCli, sizeof(bufCli)) < 0) { mvwprintw(janela,5,3,"Operacao cancelada."); wrefresh(janela); wgetch(janela); return -1; }
+    int codc = atoi(bufCli);
+    if (!id_existe_no_csv(arquivoClientes, codc)) { mvwprintw(janela,5,3,"Cliente nao existe."); wrefresh(janela); wgetch(janela); return -1; }
+
+    mvwprintw(janela,5,3,"Codigo do Pedido: "); wrefresh(janela);
+    char bufPed[64];
+    if (ui_getline_or_esc(janela, 5, 21, bufPed, sizeof(bufPed)) < 0) { mvwprintw(janela,7,3,"Operacao cancelada."); wrefresh(janela); wgetch(janela); return -1; }
+    int codp = atoi(bufPed);
+
+    FILE *fp = fopen(ARQUIVO_PEDIDOS, "r");
+    if(!fp) { mvwprintw(janela,7,3,"Nenhum pedido cadastrado."); wrefresh(janela); wgetch(janela); return 0; }
+
+    FILE *temp = fopen("Pedidos_temp.csv","w");
+    if(!temp) { fclose(fp); mvwprintw(janela,7,3,"Erro ao criar arquivo temporario."); wrefresh(janela); wgetch(janela); return -1; }
+
+    char linha[1024];
+    int deletado = 0;
+    while(fgets(linha, sizeof(linha), fp)){
+        int cpd, ccli, cprod, qtd; char data[64], desc[200], status[64]; double total;
+        if (sscanf(linha, "%d ; %d ; %d ; %d ; %[^;] ; %[^;] ; %lf ; %s", &cpd, &ccli, &cprod, &qtd, data, desc, &total, status) == 8) {
+            if (cpd == codp && ccli == codc) {
+                deletado = 1; // pula
+            } else {
+                fprintf(temp, "%s", linha);
+            }
+        } else {
+            fprintf(temp, "%s", linha);
+        }
+    }
+
+    fclose(fp); fclose(temp);
+
+    remove(ARQUIVO_PEDIDOS);
+    rename("Pedidos_temp.csv", ARQUIVO_PEDIDOS);
+
+    if (deletado) mvwprintw(janela,7,3,"Pedido removido com sucesso."); else mvwprintw(janela,7,3,"Pedido nao encontrado.");
+    wrefresh(janela); wgetch(janela);
+    return deletado ? 0 : 1;
+}
+
+/* ===================== Submenu para integrar com menu.c ===================== */
+void submenu_pedido_ncurses() {
+    int xmax, ymax; getmaxyx(stdscr, ymax, xmax);
+    WINDOW *jan = newwin(20, xmax - 10, ymax - 25, 5);
+    box(jan,0,0);
+
+    char opcoes[5][30] = {"Cadastrar Pedido","Listar Pedidos","Remover Pedido","Consultar Pedido","Voltar"};
+    char titulo[100] = "====== Menu Pedido ======";
+
+    start_color(); init_pair(1, COLOR_CYAN, COLOR_WHITE); init_pair(2, COLOR_WHITE, COLOR_CYAN);
+    wbkgd(jan, COLOR_PAIR(1));
+    keypad(stdscr, TRUE);
+
+    int seletor = 0; int tecla;
+    while(1) {
+        werase(jan); box(jan,0,0);
+        wattron(jan, COLOR_PAIR(1)); mvwprintw(jan,1,40, "%s", titulo); wattroff(jan, COLOR_PAIR(1));
+        for (int i=0;i<5;i++){
+            if (i==seletor) { wattron(jan,COLOR_PAIR(2)); mvwprintw(jan, i+3, 3, "%s", opcoes[i]); wattroff(jan,COLOR_PAIR(2)); }
+            else { wattron(jan,COLOR_PAIR(1)); mvwprintw(jan, i+3, 3, "%s", opcoes[i]); wattroff(jan,COLOR_PAIR(1)); }
+        }
+        wrefresh(jan);
+        tecla = getch();
+        switch(tecla){
+            case KEY_UP: seletor--; if(seletor<0) seletor=4; break;
+            case KEY_DOWN: seletor++; if(seletor>4) seletor=0; break;
+            case '\n': case KEY_ENTER:
+                if (seletor==0) ui_cadastrar_pedido(jan, "cliente.csv", "produto.csv");
+                else if (seletor==1) ui_listar_pedidos(jan);
+                else if (seletor==2) ui_remover_pedido(jan, "cliente.csv");
+                else if (seletor==3) ui_consultar_pedido(jan, "cliente.csv");
+                else if (seletor==4) { delwin(jan); return; }
+                break;
+        }
+    }
+}
