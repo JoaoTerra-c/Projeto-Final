@@ -6,14 +6,14 @@
 #include "pedido.h"
 
 /* Funções utilitárias */
-void obterDataAtual(char *destino, int tamanho){
+void DataAtual(char *destino, int tamanho){
     time_t agora = time(NULL);
     struct tm *tm_info = localtime(&agora);
     snprintf(destino, tamanho, "%02d/%02d/%04d",
              tm_info->tm_mday, tm_info->tm_mon + 1, tm_info->tm_year + 1900);
 }
 
-int codigoClienteJaExiste(const char *arquivoClientes, int code){
+int codClientejaaExiste(const char *arquivoClientes, int code){
     FILE *fp = fopen(arquivoClientes, "r");
     if(!fp) return 0;
 
@@ -31,7 +31,7 @@ int codigoClienteJaExiste(const char *arquivoClientes, int code){
     return 0;
 }
 
-int codigoProdutoJaExiste(const char *arquivoProdutos, int code){
+int codProdutojaExiste(const char *arquivoProdutos, int code){
     FILE *fp = fopen(arquivoProdutos, "r");
     if(!fp) return 0;
 
@@ -49,7 +49,7 @@ int codigoProdutoJaExiste(const char *arquivoProdutos, int code){
     return 0;
 }
 
-int obterDadosProduto(const char *arquivoProdutos, int codigoProduto, char *descricaoDestino, double *precoDestino){
+int obterinfoProduto(const char *arquivoProdutos, int codigoProduto, char *descricaoDestino, double *precoDestino){
     FILE *fp = fopen(arquivoProdutos, "r");
     if(!fp) return 0;
 
@@ -60,6 +60,7 @@ int obterDadosProduto(const char *arquivoProdutos, int codigoProduto, char *desc
         double preco;
         int est;
 
+        // Note: Presuming product file format is: ID ; Description ; Price ; Stock
         if(sscanf(linha, "%d ; %[^;] ; %lf ; %d", &id, desc, &preco, &est) == 4){
             if(id == codigoProduto){
                 strcpy(descricaoDestino, desc);
@@ -74,11 +75,13 @@ int obterDadosProduto(const char *arquivoProdutos, int codigoProduto, char *desc
     return 0;
 }
 
-int codigoPedidoJaExiste(FILE* fpPe, int code){
+int codigoPedidojaExiste(FILE* fpPe, int code){
     rewind(fpPe);
     int codigoPedido;
 
-    while(fscanf(fpPe, "%d ; %*d ; %*d ; %*d ; %*[^;] ; %*[^;] ; %*lf ; %[^
+    // A leitura tenta casar o primeiro campo (código do pedido)
+    // e ignora o resto da linha até o final da linha.
+    while(fscanf(fpPe, "%d ; %*d ; %*d ; %*d ; %*[^;] ; %*[^;] ; %*lf ; %*[^
 ]%*c", &codigoPedido) == 1){
         if(codigoPedido == code)
             return 1;
@@ -100,7 +103,7 @@ void cadastrarPedido(FILE *fpPe, const char *arquivoClientes, const char *arquiv
     mvprintw(2,0,"Código do Pedido: ");
     scanw("%d", &p.codigoPedido);
 
-    if(codigoPedidoJaExiste(fpPe, p.codigoPedido)){
+    if(codigoPedidojaExiste(fpPe, p.codigoPedido)){
         mvprintw(5,0,"Erro: código já existe!");
         getch();
         return;
@@ -109,7 +112,7 @@ void cadastrarPedido(FILE *fpPe, const char *arquivoClientes, const char *arquiv
     mvprintw(3,0,"Código do Cliente: ");
     scanw("%d", &p.codigoCliente);
 
-    if(!codigoClienteJaExiste(arquivoClientes, p.codigoCliente)){
+    if(!codClientejaaExiste(arquivoClientes, p.codigoCliente)){
         mvprintw(6,0,"Erro: cliente não existe!");
         getch();
         return;
@@ -118,7 +121,7 @@ void cadastrarPedido(FILE *fpPe, const char *arquivoClientes, const char *arquiv
     mvprintw(4,0,"Código do Produto: ");
     scanw("%d", &p.codigoProduto);
 
-    if(!codigoProdutoJaExiste(arquivoProdutos, p.codigoProduto)){
+    if(!codProdutojaExiste(arquivoProdutos, p.codigoProduto)){
         mvprintw(7,0,"Erro: produto não existe!");
         getch();
         return;
@@ -127,9 +130,15 @@ void cadastrarPedido(FILE *fpPe, const char *arquivoClientes, const char *arquiv
     mvprintw(5,0,"Quantidade: ");
     scanw("%d", &p.quantidade);
 
-    obterDadosProduto(arquivoProdutos, p.codigoProduto, p.descricao, &precoUnit);
+    if(!obterinfoProduto(arquivoProdutos, p.codigoProduto, p.descricao, &precoUnit)){
+        // Isso não deve ocorrer se codProdutojaExiste for verdadeiro, mas é uma segurança
+        mvprintw(8,0,"Erro ao obter dados do produto!");
+        getch();
+        return;
+    }
+
     p.valorTotal = p.quantidade * precoUnit;
-    obterDataAtual(p.data, maxData);
+    DataAtual(p.data, maxData); // Uso da função DataAtual
     strcpy(p.status, "Pendente");
 
     fprintf(fpPe, "%d ; %d ; %d ; %d ; %s ; %s ; %.2f ; %s\n",
@@ -150,6 +159,7 @@ void listarPedidos(FILE *fpPe){
     Pedido p;
     printw("===== LISTA DE PEDIDOS =====\n\n");
 
+    // A leitura tenta casar 8 campos, com tratamento para strings com espaços
     while(fscanf(fpPe, "%d ; %d ; %d ; %d ; %[^;] ; %[^;] ; %lf ; %[^
 ]%*c",
                  &p.codigoPedido, &p.codigoCliente, &p.codigoProduto, &p.quantidade,
@@ -172,7 +182,7 @@ int consultarPedido(FILE *fpPe, const char *arquivoClientes){
     mvprintw(0,0,"Código do Cliente: ");
     scanw("%d", &codigoCliente);
 
-    if(!codigoClienteJaExiste(arquivoClientes, codigoCliente)){
+    if(!codClientejaaExiste(arquivoClientes, codigoCliente)){
         mvprintw(3,0,"Cliente não existe!");
         getch();
         return 0;
@@ -207,7 +217,7 @@ FILE* atualizarPedido(FILE *fpPe, const char *arquivoClientes, const char *arqui
     mvprintw(0,0,"Código do Cliente: ");
     scanw("%d", &codigoCliente);
 
-    if(!codigoClienteJaExiste(arquivoClientes, codigoCliente)){
+    if(!codClientejaaExiste(arquivoClientes, codigoCliente)){
         mvprintw(3,0,"Cliente não existe!");
         getch();
         return fpPe;
@@ -217,6 +227,13 @@ FILE* atualizarPedido(FILE *fpPe, const char *arquivoClientes, const char *arqui
     scanw("%d", &codigoPedido);
 
     FILE *temp = fopen("Pedidos_temp.csv", "w");
+    if (temp == NULL) {
+        // Tratamento de erro
+        mvprintw(5, 0, "Erro ao criar arquivo temporário!");
+        getch();
+        return fpPe;
+    }
+
 
     rewind(fpPe);
 
@@ -244,19 +261,29 @@ FILE* atualizarPedido(FILE *fpPe, const char *arquivoClientes, const char *arqui
 
             if(opc == 1){
                 mvprintw(5,0,"Novo codigo produto: "); scanw("%d",&p.codigoProduto);
-                obterDadosProduto(arquivoProdutos, p.codigoProduto, p.descricao, &precoU);
-                p.valorTotal = p.quantidade * precoU;
+                if(obterinfoProduto(arquivoProdutos, p.codigoProduto, p.descricao, &precoU)){
+                     p.valorTotal = p.quantidade * precoU;
+                } else {
+                    // Trata caso o novo produto não exista
+                    mvprintw(6,0,"Novo produto não existe!");
+                    getch();
+                    // Poderia manter o produto antigo ou sair, aqui opto por seguir com o valor total antigo
+                    // A lógica original não tratava este erro, apenas a alteração de código.
+                }
+
             }
             else if(opc == 2){
                 mvprintw(5,0,"Nova quantidade: "); scanw("%d",&p.quantidade);
-                obterDadosProduto(arquivoProdutos, p.codigoProduto, p.descricao, &precoU);
-                p.valorTotal = p.quantidade * precoU;
+                // Assume que o produto atual é válido
+                if(obterinfoProduto(arquivoProdutos, p.codigoProduto, p.descricao, &precoU)){
+                    p.valorTotal = p.quantidade * precoU;
+                }
             }
             else if(opc == 3){
                 mvprintw(5,0,"Novo status: "); scanw("%s", p.status);
             }
 
-            obterDataAtual(p.data, maxData);
+            DataAtual(p.data, maxData); // Uso da função DataAtual
         }
 
         fprintf(temp,"%d ; %d ; %d ; %d ; %s ; %s ; %.2f ; %s\n",
@@ -271,6 +298,13 @@ FILE* atualizarPedido(FILE *fpPe, const char *arquivoClientes, const char *arqui
     rename("Pedidos_temp.csv", ARQUIVO_PEDIDOS);
 
     fpPe = fopen(ARQUIVO_PEDIDOS, "a+");
+    if (fpPe == NULL) {
+        // Tratamento de erro se não conseguir reabrir o arquivo principal
+        clear();
+        mvprintw(1, 0, "Erro crítico: não foi possível reabrir o arquivo de pedidos!");
+        getch();
+        // Em um ambiente de produção, aqui deveria haver um tratamento mais robusto.
+    }
 
     clear();
     if(encontrado)
@@ -293,7 +327,7 @@ FILE* deletarPedido(FILE *fpPe, const char *arquivoClientes){
     mvprintw(0,0,"Código do Cliente: ");
     scanw("%d",&codigoCliente);
 
-    if(!codigoClienteJaExiste(arquivoClientes, codigoCliente)){
+    if(!codClientejaaExiste(arquivoClientes, codigoCliente)){
         mvprintw(3,0,"Cliente não existe!");
         getch();
         return fpPe;
@@ -303,6 +337,12 @@ FILE* deletarPedido(FILE *fpPe, const char *arquivoClientes){
     scanw("%d",&codigoPedido);
 
     FILE *temp = fopen("Pedidos_temp.csv","w");
+    if (temp == NULL) {
+        // Tratamento de erro
+        mvprintw(5, 0, "Erro ao criar arquivo temporário!");
+        getch();
+        return fpPe;
+    }
 
     rewind(fpPe);
     Pedido p;
@@ -329,6 +369,13 @@ FILE* deletarPedido(FILE *fpPe, const char *arquivoClientes){
     rename("Pedidos_temp.csv", ARQUIVO_PEDIDOS);
 
     fpPe = fopen(ARQUIVO_PEDIDOS, "a+");
+    if (fpPe == NULL) {
+        // Tratamento de erro
+        clear();
+        mvprintw(2, 0, "Erro crítico: não foi possível reabrir o arquivo de pedidos!");
+        getch();
+        // Em um ambiente de produção, aqui deveria haver um tratamento mais robusto.
+    }
 
     clear();
     if(deletado)
