@@ -14,10 +14,6 @@
    - Consultar pedidos por cliente
    - Remover pedido
 
-   Arquivos CSV esperados:
-   - cliente.csv  (cada linha começa com: id ; ...)
-   - produto.csv  (cada linha: id ; descricao ; preco ; estoque)
-   - Pedidos.csv  (arquivo de pedidos, criado/atualizado por este módulo)
 
 */
 
