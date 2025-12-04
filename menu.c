@@ -537,7 +537,7 @@ int ui_listar_clientes(WINDOW *janela) {
     }
 
     int topo = 0;                         // índice da primeira linha visível
-    int visiveis = ymax - 6;              // cabeçalho + rodapé
+    int visiveis = ymax - 7;              // cabeçalho + rodapé
     if (visiveis < 1) visiveis = 1;
 
     keypad(janela, TRUE);

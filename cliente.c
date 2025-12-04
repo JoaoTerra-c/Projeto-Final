@@ -101,11 +101,6 @@ int cliente_gravar_csv(const Cliente *c) {
     return 0;
 }
 
-static void remover_quebra_linha_final(char *texto) {
-    if (!texto) return;
-    texto[strcspn(texto, "\r\n")] = '\0';
-}
-
 int cliente_cpf_existe_no_csv(const char *path, const char *cpf_procurado) {
     if (!path || !cpf_procurado || !cpf_procurado[0]) return 0;
     FILE *f = fopen(path, "r");
@@ -513,7 +508,7 @@ void normaliza_excel_texto(char *s) {
     }
 }
 
-// mantém só dígitos (útil para CPF/CNPJ/telefone)
+// mantém só dígitos (para CPF/CNPJ/telefone)
 void somente_digitos(char *s) {
     if (!s) return;
     char *p = s, *q = s;
